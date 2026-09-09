@@ -1,0 +1,1495 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Checklist de Veículos</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0f1117;
+  --surface: #1a1d27;
+  --card: #21253a;
+  --border: #2e3350;
+  --accent: #4f8ef7;
+  --accent2: #f7a14f;
+  --green: #3dd68c;
+  --yellow: #f7c94f;
+  --red: #f75f5f;
+  --text: #e8eaf6;
+  --muted: #7b82a8;
+  --radius: 14px;
+  --radius-sm: 10px;
+  --tab-h: 83px;
+  --header-h: 100px;
+  --font: -apple-system, 'SF Pro Display', system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* ═══ SAFE AREA ═══ */
+.safe-top { padding-top: env(safe-area-inset-top, 20px); }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom, 20px); }
+
+/* ═══ STATUS BAR SPACER ═══ */
+.status-bar {
+  height: env(safe-area-inset-top, 44px);
+  background: var(--surface);
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 200;
+}
+
+/* ═══ HEADER ═══ */
+.app-header {
+  position: fixed;
+  top: env(safe-area-inset-top, 44px);
+  left: 0; right: 0;
+  z-index: 100;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 18px 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.app-header .logo {
+  width: 38px; height: 38px;
+  background: linear-gradient(135deg, var(--accent), #3a6fd8);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; flex-shrink: 0;
+}
+.app-header h1 { font-size: 1rem; font-weight: 700; line-height: 1.1; }
+.app-header p { font-size: .72rem; color: var(--muted); margin-top: 2px; }
+.header-actions { margin-left: auto; display: flex; gap: 8px; }
+.icon-btn {
+  width: 34px; height: 34px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  cursor: pointer;
+  color: var(--text);
+  flex-shrink: 0;
+}
+
+/* ═══ SCROLL CONTAINER ═══ */
+.scroll-container {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 44px) + 67px);
+  bottom: var(--tab-h);
+  left: 0; right: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+.scroll-inner { padding: 16px 16px 24px; }
+
+/* ═══ PANELS ═══ */
+.panel { display: none; }
+.panel.active { display: block; }
+
+/* ═══ TAB BAR (bottom) ═══ */
+.tab-bar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: var(--tab-h);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  display: flex;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: 100;
+}
+.tab-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  cursor: pointer;
+  padding: 10px 4px;
+  color: var(--muted);
+  font-size: .64rem;
+  font-weight: 500;
+  transition: color .15s;
+  position: relative;
+}
+.tab-item.active { color: var(--accent); }
+.tab-icon { font-size: 22px; line-height: 1; }
+.tab-badge {
+  position: absolute;
+  top: 6px; right: calc(50% - 18px);
+  background: var(--red);
+  color: #fff;
+  border-radius: 10px;
+  font-size: .58rem;
+  font-weight: 800;
+  padding: 1px 5px;
+  min-width: 16px;
+  text-align: center;
+}
+
+/* ═══ SECTION TITLE ═══ */
+.section-label {
+  font-size: .7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--muted);
+  margin: 18px 0 8px 4px;
+}
+.section-label:first-child { margin-top: 0; }
+
+/* ═══ STAT CARDS (2-up grid) ═══ */
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 14px;
+}
+.stat-card .val {
+  font-size: 1.85rem;
+  font-weight: 800;
+  color: var(--accent);
+  line-height: 1;
+  letter-spacing: -.02em;
+}
+.stat-card .lbl { font-size: .72rem; color: var(--muted); margin-top: 5px; line-height: 1.2; }
+.stat-card.clickable { cursor: pointer; }
+.stat-card.clickable:active { opacity: .7; }
+
+/* ═══ FILTER ROW ═══ */
+.filter-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+}
+.filter-row::-webkit-scrollbar { display: none; }
+.filter-pill {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 7px 14px;
+  font-size: .78rem;
+  color: var(--muted);
+  white-space: nowrap;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all .15s;
+}
+.filter-pill.active { background: rgba(79,142,247,.15); border-color: var(--accent); color: var(--accent); }
+
+/* ═══ INSPECTION CARDS ═══ */
+.insp-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  position: relative;
+  overflow: hidden;
+}
+.insp-card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+}
+.insp-card.oil-ok::before { background: var(--green); }
+.insp-card.oil-warn::before { background: var(--yellow); }
+.insp-card.oil-bad::before { background: var(--red); }
+.insp-card.oil-pending::before { background: var(--border); }
+
+.insp-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.placa-tag {
+  background: rgba(79,142,247,.15);
+  color: var(--accent);
+  font-weight: 800;
+  padding: 4px 9px;
+  border-radius: 6px;
+  font-size: .82rem;
+  letter-spacing: .05em;
+}
+.insp-modelo { font-size: .92rem; font-weight: 700; flex: 1; }
+.insp-date { font-size: .72rem; color: var(--muted); }
+.insp-meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.meta-chip {
+  font-size: .73rem;
+  color: var(--muted);
+  background: var(--card);
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+.insp-footer { display: flex; align-items: center; gap: 8px; }
+.badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 3px 9px;
+  border-radius: 6px;
+  font-size: .73rem;
+  font-weight: 700;
+}
+.badge-ok { background: rgba(61,214,140,.12); color: var(--green); }
+.badge-def { background: rgba(247,95,95,.12); color: var(--red); }
+.badge-atk { background: rgba(247,201,79,.12); color: var(--yellow); }
+.badge-oil-ok { background: rgba(61,214,140,.12); color: var(--green); }
+.badge-oil-warn { background: rgba(247,201,79,.12); color: var(--yellow); }
+.badge-oil-bad { background: rgba(247,95,95,.12); color: var(--red); }
+
+.action-btns { margin-left: auto; display: flex; gap: 6px; }
+.act-btn {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--muted);
+  font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: all .15s;
+  flex-shrink: 0;
+}
+.act-btn:active { opacity: .6; transform: scale(.93); }
+.act-btn.repair { border-color: var(--accent2); color: var(--accent2); }
+.act-btn.del { border-color: rgba(247,95,95,.4); color: var(--red); }
+
+/* ═══ EMPTY STATE ═══ */
+.empty-state {
+  text-align: center;
+  padding: 48px 20px;
+  color: var(--muted);
+}
+.empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+.empty-state p { font-size: .88rem; line-height: 1.5; }
+
+/* ═══ FORM ═══ */
+.form-group {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+.form-row {
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  min-height: 52px;
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+}
+.form-row:last-child { border-bottom: none; }
+.form-row label {
+  font-size: .83rem;
+  color: var(--text);
+  font-weight: 500;
+  width: 130px;
+  flex-shrink: 0;
+}
+.form-row input,
+.form-row textarea,
+.form-row select {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: .88rem;
+  outline: none;
+  font-family: var(--font);
+  text-align: right;
+  padding: 14px 0;
+  min-width: 0;
+}
+.form-row input::placeholder,
+.form-row textarea::placeholder { color: var(--muted); }
+.form-row textarea {
+  text-align: left;
+  resize: none;
+  padding: 14px 0;
+  min-height: 80px;
+}
+.form-row select { text-align: right; -webkit-appearance: none; }
+input[type=date] { color-scheme: dark; }
+
+/* ═══ CHECKLIST ITEMS ═══ */
+.check-group {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.check-row {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  gap: 10px;
+}
+.check-row:last-child { border-bottom: none; }
+.check-row span { font-size: .84rem; flex: 1; }
+.tri-btns { display: flex; gap: 5px; flex-shrink: 0; }
+.tri-btn {
+  height: 28px;
+  padding: 0 9px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--muted);
+  font-size: .7rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .12s;
+  white-space: nowrap;
+}
+.tri-btn:active { transform: scale(.92); }
+.tri-btn.sel-ok { background: rgba(61,214,140,.15); border-color: var(--green); color: var(--green); }
+.tri-btn.sel-def { background: rgba(247,95,95,.15); border-color: var(--red); color: var(--red); }
+.tri-btn.sel-atk { background: rgba(247,201,79,.15); border-color: var(--yellow); color: var(--yellow); }
+
+/* ═══ OIL STATUS BOX ═══ */
+.oil-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  font-size: .84rem;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+/* ═══ SUBMIT BTN ═══ */
+.btn-submit {
+  width: 100%;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity .15s;
+  font-family: var(--font);
+  margin-top: 4px;
+}
+.btn-submit:active { opacity: .8; }
+
+.form-msg {
+  text-align: center;
+  font-size: .84rem;
+  color: var(--green);
+  padding: 10px;
+  display: none;
+}
+
+/* ═══ REPAIR CARDS ═══ */
+.repair-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+.repair-card.aberto { border-left: 4px solid var(--red); }
+.repair-card.concluido { border-left: 4px solid var(--green); }
+.repair-inner { padding: 14px 16px; }
+.repair-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.status-pill {
+  padding: 3px 10px; border-radius: 20px;
+  font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em;
+}
+.status-pill.aberto { background: rgba(247,95,95,.15); color: var(--red); }
+.status-pill.concluido { background: rgba(61,214,140,.15); color: var(--green); }
+.repair-model { font-size: .9rem; font-weight: 700; }
+.repair-meta { font-size: .74rem; color: var(--muted); margin-bottom: 8px; }
+.defect-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+.defect-tag {
+  background: rgba(247,95,95,.12); color: var(--red);
+  border: 1px solid rgba(247,95,95,.3);
+  border-radius: 5px; padding: 2px 7px; font-size: .7rem;
+}
+.atk-tag {
+  background: rgba(247,201,79,.12); color: var(--yellow);
+  border: 1px solid rgba(247,201,79,.3);
+  border-radius: 5px; padding: 2px 7px; font-size: .7rem;
+}
+.repair-obs { font-size: .78rem; color: var(--muted); font-style: italic;
+  background: var(--card); border-radius: 8px; padding: 8px 10px; margin-bottom: 10px; }
+.repair-conclusion {
+  background: var(--card); border-radius: 8px; padding: 10px 12px;
+  font-size: .78rem; margin-bottom: 10px;
+}
+.repair-conclusion .c-lbl { font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 5px; font-weight: 700; }
+.repair-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.btn-outline {
+  padding: 9px 18px; border-radius: 9px;
+  font-size: .8rem; font-weight: 700;
+  cursor: pointer; transition: all .15s;
+  font-family: var(--font);
+}
+.btn-outline:active { opacity: .7; }
+.btn-green { background: rgba(61,214,140,.12); border: 1px solid var(--green); color: var(--green); }
+.btn-red { background: rgba(247,95,95,.12); border: 1px solid var(--red); color: var(--red); }
+.btn-blue { background: rgba(79,142,247,.12); border: 1px solid var(--accent); color: var(--accent); }
+
+/* ═══ HISTORY CARD ═══ */
+.hist-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--green);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 10px;
+}
+.hist-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.hist-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.hist-field .lbl { font-size: .7rem; color: var(--muted); }
+.hist-field .val { font-size: .82rem; font-weight: 600; }
+
+/* ═══ CHARTS ═══ */
+.chart-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.chart-title { font-size: .75rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--muted); margin-bottom: 14px; }
+.chart-wrap { position: relative; height: 200px; }
+
+/* ═══ MODAL ═══ */
+.modal-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.7);
+  z-index: 300;
+  align-items: flex-end;
+  justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal-sheet {
+  background: var(--surface);
+  border-radius: 20px 20px 0 0;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 0 env(safe-area-inset-bottom, 20px);
+  animation: slideUp .25s ease;
+}
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.modal-handle {
+  width: 40px; height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin: 12px auto 0;
+}
+.modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-head h2 { font-size: .95rem; font-weight: 700; }
+.modal-close {
+  width: 30px; height: 30px;
+  background: var(--card); border: none; border-radius: 50%;
+  color: var(--muted); font-size: 1rem; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.modal-body { padding: 16px 20px; }
+
+.detail-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 11px 0; border-bottom: 1px solid var(--border);
+  font-size: .84rem;
+}
+.detail-row:last-child { border-bottom: none; }
+.detail-lbl { color: var(--muted); font-size: .8rem; }
+
+/* ═══ REPAIR MODAL FORM ═══ */
+.modal-form-group {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.modal-form-row {
+  display: flex; align-items: center;
+  padding: 0 14px;
+  min-height: 50px;
+  border-bottom: 1px solid var(--border);
+  gap: 10px;
+}
+.modal-form-row:last-child { border-bottom: none; }
+.modal-form-row label { font-size: .82rem; font-weight: 500; width: 130px; flex-shrink: 0; }
+.modal-form-row input,
+.modal-form-row textarea {
+  flex: 1; background: transparent; border: none; color: var(--text);
+  font-size: .86rem; outline: none; font-family: var(--font);
+  text-align: right; padding: 12px 0;
+}
+.modal-form-row textarea { text-align: left; resize: none; min-height: 70px; padding: 12px 0; }
+.modal-form-row input::placeholder,
+.modal-form-row textarea::placeholder { color: var(--muted); }
+
+/* ═══ FILTER SHEET ═══ */
+.filter-sheet-group {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.filter-sheet-row {
+  display: flex; align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+}
+.filter-sheet-row:last-child { border-bottom: none; }
+.filter-sheet-row label { font-size: .84rem; font-weight: 500; flex: 1; }
+.filter-sheet-row select,
+.filter-sheet-row input {
+  background: transparent; border: none; color: var(--accent);
+  font-size: .84rem; outline: none; font-family: var(--font);
+  text-align: right; -webkit-appearance: none;
+}
+
+/* ═══ TOAST ═══ */
+.toast {
+  position: fixed; bottom: calc(var(--tab-h) + 16px); left: 50%; transform: translateX(-50%);
+  background: var(--green); color: #0a2318;
+  padding: 12px 22px; border-radius: 40px;
+  font-size: .88rem; font-weight: 700;
+  z-index: 500; display: none;
+  white-space: nowrap;
+  box-shadow: 0 4px 20px rgba(0,0,0,.4);
+}
+.toast.show { display: block; animation: fadeInOut 2.5s ease; }
+@keyframes fadeInOut {
+  0% { opacity: 0; transform: translateX(-50%) translateY(10px); }
+  15% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+</style>
+</head>
+<body>
+
+<!-- STATUS BAR -->
+<div class="status-bar"></div>
+
+<!-- HEADER -->
+<div class="app-header">
+  <div class="logo">🚗</div>
+  <div>
+    <h1>Checklist de Veículos</h1>
+    <p>Gestão de frota</p>
+  </div>
+  <div class="header-actions">
+    <div class="icon-btn" onclick="openFilterSheet()" title="Filtros">⚙️</div>
+    <div class="icon-btn" onclick="exportJSON()" title="Exportar">📤</div>
+    <div class="icon-btn" onclick="document.getElementById('importInput').click()" title="Importar">📥</div>
+    <input type="file" id="importInput" accept=".json" style="display:none" onchange="importJSON(event)">
+  </div>
+</div>
+
+<!-- SCROLL AREA -->
+<div class="scroll-container" id="scrollContainer">
+  <div class="scroll-inner">
+
+    <!-- ════ REGISTROS ════ -->
+    <div class="panel active" id="panel-registros">
+      <div id="statsGrid" class="stats-grid"></div>
+      <div class="section-label">Inspeções</div>
+      <div id="inspList"></div>
+      <div id="inspEmpty" class="empty-state" style="display:none">
+        <div class="icon">📋</div>
+        <p>Nenhuma inspeção registrada.<br>Use a aba "Nova" para começar.</p>
+      </div>
+    </div>
+
+    <!-- ════ NOVA INSPEÇÃO ════ -->
+    <div class="panel" id="panel-nova">
+      <div class="section-label">Dados do Veículo</div>
+      <div class="form-group">
+        <div class="form-row">
+          <label>Veículo *</label>
+          <input type="text" id="fModelo" placeholder="Ex: Fiat Strada 2022">
+        </div>
+        <div class="form-row">
+          <label>Placa *</label>
+          <input type="text" id="fPlaca" placeholder="ABC-1234" maxlength="8" style="text-transform:uppercase">
+        </div>
+        <div class="form-row">
+          <label>Data *</label>
+          <input type="date" id="fData">
+        </div>
+        <div class="form-row">
+          <label>Responsável</label>
+          <input type="text" id="fResponsavel" placeholder="Nome">
+        </div>
+      </div>
+
+      <div class="section-label">Itens de Verificação</div>
+      <div class="check-group" id="checklistGrid"></div>
+
+      <div class="section-label">Quilometragem e Óleo</div>
+      <div class="form-group">
+        <div class="form-row">
+          <label>KM Atual *</label>
+          <input type="number" id="fKmAtual" placeholder="122941" oninput="calcOil()">
+        </div>
+        <div class="form-row">
+          <label>KM Última Troca</label>
+          <input type="number" id="fKmUltTroca" placeholder="118346" oninput="calcOil()">
+        </div>
+        <div class="form-row">
+          <label>KM Próxima Troca</label>
+          <input type="number" id="fKmProxTroca" readonly style="opacity:.5">
+        </div>
+      </div>
+      <div class="oil-box" id="oilStatus">— Preencha o KM atual e o KM da última troca</div>
+
+      <div class="section-label">Observações</div>
+      <div class="form-group">
+        <div class="form-row">
+          <textarea id="fObs" placeholder="Defeitos, observações gerais..."></textarea>
+        </div>
+      </div>
+
+      <button class="btn-submit" onclick="saveInspection()">💾 Salvar Inspeção</button>
+      <div class="form-msg" id="formMsg">✅ Inspeção salva com sucesso!</div>
+    </div>
+
+    <!-- ════ REPAROS ════ -->
+    <div class="panel" id="panel-reparos">
+      <div id="repairStats" class="stats-grid" style="grid-template-columns:1fr 1fr 1fr"></div>
+      <div class="section-label">Pedidos de Reparo</div>
+      <div id="repairList"></div>
+      <div id="repairEmpty" class="empty-state" style="display:none">
+        <div class="icon">🔧</div>
+        <p>Nenhum pedido de reparo.<br>Pedidos são criados a partir de inspeções com defeitos.</p>
+      </div>
+    </div>
+
+    <!-- ════ HISTÓRICO ════ -->
+    <div class="panel" id="panel-historico">
+      <div class="section-label">Filtros</div>
+      <div class="form-group">
+        <div class="form-row">
+          <label>Placa</label>
+          <select id="histFilterPlaca" onchange="renderHistory()">
+            <option value="">Todas</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Data inicial</label>
+          <input type="date" id="histFilterDtIni" onchange="renderHistory()">
+        </div>
+        <div class="form-row">
+          <label>Data final</label>
+          <input type="date" id="histFilterDtFim" onchange="renderHistory()">
+        </div>
+      </div>
+      <div class="section-label">Reparos Concluídos</div>
+      <div id="historyList"></div>
+      <div id="historyEmpty" class="empty-state" style="display:none">
+        <div class="icon">📂</div>
+        <p>Nenhum reparo concluído ainda.</p>
+      </div>
+    </div>
+
+    <!-- ════ GRÁFICOS ════ -->
+    <div class="panel" id="panel-graficos">
+      <div class="chart-card">
+        <div class="chart-title">📍 KM Total por Veículo</div>
+        <div class="chart-wrap"><canvas id="chartKmTotal"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">📈 KM por Mês (últimos 6 meses)</div>
+        <div class="chart-wrap"><canvas id="chartKmMes"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">🔧 Status dos Itens</div>
+        <div class="chart-wrap"><canvas id="chartItens"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">🛢️ Status de Óleo por Veículo</div>
+        <div class="chart-wrap"><canvas id="chartOleo"></canvas></div>
+      </div>
+      <div id="chartsEmpty" class="empty-state" style="display:none">
+        <div class="icon">📊</div>
+        <p>Nenhum dado ainda.</p>
+      </div>
+    </div>
+
+  </div><!-- /scroll-inner -->
+</div><!-- /scroll-container -->
+
+<!-- TAB BAR -->
+<div class="tab-bar">
+  <div class="tab-item active" onclick="switchTab('registros')">
+    <div class="tab-icon">📋</div>
+    <span>Registros</span>
+  </div>
+  <div class="tab-item" onclick="switchTab('nova')">
+    <div class="tab-icon">➕</div>
+    <span>Nova</span>
+  </div>
+  <div class="tab-item" onclick="switchTab('reparos')">
+    <div class="tab-icon">🔧</div>
+    <span>Reparos</span>
+    <div class="tab-badge" id="repairBadge" style="display:none"></div>
+  </div>
+  <div class="tab-item" onclick="switchTab('historico')">
+    <div class="tab-icon">📂</div>
+    <span>Histórico</span>
+  </div>
+  <div class="tab-item" onclick="switchTab('graficos')">
+    <div class="tab-icon">📊</div>
+    <span>Gráficos</span>
+  </div>
+</div>
+
+<!-- MODAL: DETALHE INSPEÇÃO -->
+<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-head">
+      <h2 id="modalTitle">Detalhes</h2>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<!-- MODAL: FECHAR REPARO -->
+<div class="modal-overlay" id="repairOverlay" onclick="if(event.target===this)closeRepairModal()">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-head">
+      <h2 id="repairModalTitle">Fechar Reparo</h2>
+      <button class="modal-close" onclick="closeRepairModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="repairModalInfo" style="margin-bottom:14px"></div>
+      <div class="section-label" style="margin-top:0">Dados do Reparo</div>
+      <div class="modal-form-group">
+        <div class="modal-form-row">
+          <label>Mecânico *</label>
+          <input type="text" id="repairMecanico" placeholder="Nome">
+        </div>
+        <div class="modal-form-row">
+          <label>Data Conclusão *</label>
+          <input type="date" id="repairDataConc">
+        </div>
+        <div class="modal-form-row">
+          <label>Custo (R$)</label>
+          <input type="number" id="repairCusto" placeholder="0,00" step="0.01">
+        </div>
+        <div class="modal-form-row">
+          <label>Serviços</label>
+          <textarea id="repairPecas" placeholder="Serviços executados..."></textarea>
+        </div>
+        <div class="modal-form-row">
+          <label>Observações</label>
+          <textarea id="repairObsConc" placeholder="Observações..."></textarea>
+        </div>
+      </div>
+      <button class="btn-submit" onclick="concludeRepair()">✅ Confirmar Fechamento</button>
+      <div class="form-msg" id="repairMsg">✅ Reparo fechado!</div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: FILTROS -->
+<div class="modal-overlay" id="filterOverlay" onclick="if(event.target===this)closeFilterSheet()">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-head">
+      <h2>Filtros de Registros</h2>
+      <button class="modal-close" onclick="closeFilterSheet()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="filter-sheet-group">
+        <div class="filter-sheet-row">
+          <label>Placa</label>
+          <select id="filterPlaca" onchange="renderTable()">
+            <option value="">Todas</option>
+          </select>
+        </div>
+        <div class="filter-sheet-row">
+          <label>Data inicial</label>
+          <input type="date" id="filterDtIni" onchange="renderTable()">
+        </div>
+        <div class="filter-sheet-row">
+          <label>Data final</label>
+          <input type="date" id="filterDtFim" onchange="renderTable()">
+        </div>
+        <div class="filter-sheet-row">
+          <label>Status óleo</label>
+          <select id="filterOleo" onchange="renderTable()">
+            <option value="">Todos</option>
+            <option value="ok">✅ OK</option>
+            <option value="warn">⚠️ Em breve</option>
+            <option value="bad">🔴 Vencido</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn-submit" onclick="clearFilters();closeFilterSheet()">✖ Limpar Filtros</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══ DATA ═══
+const CHECKLIST_ITEMS = [
+  'Setas dianteiras (esq. e dir.)','Setas traseiras (esq. e dir.)',
+  'Farol baixo','Farol alto','Luz de freio','Luz de placa','Luz de ré',
+  'Macaco / Chave de roda','Estepe de roda','Triângulo de sinalização',
+  'Líquido de arrefecimento','Nível de óleo do motor','Pressão dos pneus','Limpadores de para-brisa',
+];
+
+let checkStates = {};
+let db = loadDB();
+let repairDB = loadRepairDB();
+let chartInstances = {};
+let currentRepairId = null;
+let currentTab = 'registros';
+
+function loadDB() {
+  try { return JSON.parse(localStorage.getItem('veh_checklist_v2') || '[]'); } catch { return []; }
+}
+function saveDB() { localStorage.setItem('veh_checklist_v2', JSON.stringify(db)); }
+function loadRepairDB() {
+  try { return JSON.parse(localStorage.getItem('veh_repairs_v1') || '[]'); } catch { return []; }
+}
+function saveRepairDB() { localStorage.setItem('veh_repairs_v1', JSON.stringify(repairDB)); }
+
+// ═══ INIT ═══
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('fData').value = new Date().toISOString().slice(0,10);
+  buildChecklistForm();
+  renderAll();
+  updateRepairBadge();
+});
+
+// ═══ TOAST ═══
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show';
+  setTimeout(() => t.className = 'toast', 2600);
+}
+
+// ═══ TABS ═══
+function switchTab(name) {
+  currentTab = name;
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  document.querySelectorAll('.tab-item').forEach((t, i) => {
+    const tabs = ['registros','nova','reparos','historico','graficos'];
+    t.classList.toggle('active', tabs[i] === name);
+  });
+  document.getElementById('scrollContainer').scrollTop = 0;
+  if (name === 'graficos') renderCharts();
+  if (name === 'reparos') renderRepairs();
+  if (name === 'historico') renderHistory();
+}
+
+// ═══ CHECKLIST FORM ═══
+function buildChecklistForm() {
+  const grid = document.getElementById('checklistGrid');
+  grid.innerHTML = '';
+  CHECKLIST_ITEMS.forEach((item, i) => {
+    checkStates[i] = '';
+    const row = document.createElement('div');
+    row.className = 'check-row';
+    row.innerHTML = `
+      <span>${item}</span>
+      <div class="tri-btns">
+        <button class="tri-btn" id="cb-${i}-ok" onclick="setCheck(${i},'ok')">OK</button>
+        <button class="tri-btn" id="cb-${i}-def" onclick="setCheck(${i},'def')">Def</button>
+        <button class="tri-btn" id="cb-${i}-atk" onclick="setCheck(${i},'atk')">Atk</button>
+      </div>`;
+    grid.appendChild(row);
+  });
+}
+
+function setCheck(i, state) {
+  checkStates[i] = checkStates[i] === state ? '' : state;
+  document.getElementById(`cb-${i}-ok`).className = `tri-btn${checkStates[i]==='ok'?' sel-ok':''}`;
+  document.getElementById(`cb-${i}-def`).className = `tri-btn${checkStates[i]==='def'?' sel-def':''}`;
+  document.getElementById(`cb-${i}-atk`).className = `tri-btn${checkStates[i]==='atk'?' sel-atk':''}`;
+}
+
+// ═══ OIL ═══
+function calcOil() {
+  const atual = parseInt(document.getElementById('fKmAtual').value) || 0;
+  const ult = parseInt(document.getElementById('fKmUltTroca').value) || 0;
+  const prox = ult + 5000;
+  document.getElementById('fKmProxTroca').value = ult > 0 ? prox : '';
+  const el = document.getElementById('oilStatus');
+  if (!atual || !ult) { el.textContent = '— Preencha o KM atual e KM da última troca'; el.style.color = 'var(--muted)'; return; }
+  if (atual >= prox) { el.textContent = '🔴 TROCA DE ÓLEO NECESSÁRIA'; el.style.color = 'var(--red)'; }
+  else if (atual >= prox - 500) { el.textContent = '🟡 TROCAR EM BREVE (menos de 500 km)'; el.style.color = 'var(--yellow)'; }
+  else { el.textContent = `🟢 ÓLEO OK — Próxima troca em ${(prox - atual).toLocaleString('pt-BR')} km`; el.style.color = 'var(--green)'; }
+}
+
+// ═══ SAVE ═══
+function saveInspection() {
+  const modelo = document.getElementById('fModelo').value.trim();
+  const placa = document.getElementById('fPlaca').value.trim().toUpperCase();
+  const data = document.getElementById('fData').value;
+  const resp = document.getElementById('fResponsavel').value.trim();
+  const kmAtual = parseInt(document.getElementById('fKmAtual').value) || null;
+  const kmUlt = parseInt(document.getElementById('fKmUltTroca').value) || null;
+  const kmProx = kmUlt ? kmUlt + 5000 : null;
+  const obs = document.getElementById('fObs').value.trim();
+
+  if (!modelo || !placa || !data) { showToast('⚠️ Preencha veículo, placa e data'); return; }
+
+  let oilStatus = 'pending';
+  if (kmAtual && kmProx) {
+    if (kmAtual >= kmProx) oilStatus = 'bad';
+    else if (kmAtual >= kmProx - 500) oilStatus = 'warn';
+    else oilStatus = 'ok';
+  }
+
+  const checks = {};
+  CHECKLIST_ITEMS.forEach((_, i) => { checks[i] = checkStates[i] || 'nd'; });
+  db.push({ id: Date.now(), modelo, placa, data, resp, kmAtual, kmUlt, kmProx, oilStatus, checks, obs });
+  saveDB();
+
+  const msg = document.getElementById('formMsg');
+  msg.style.display = 'block';
+  setTimeout(() => msg.style.display = 'none', 2500);
+
+  // reset
+  ['fModelo','fPlaca','fResponsavel','fKmAtual','fKmUltTroca','fObs'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('fData').value = new Date().toISOString().slice(0,10);
+  document.getElementById('fKmProxTroca').value = '';
+  document.getElementById('oilStatus').textContent = '— Preencha o KM atual e KM da última troca';
+  document.getElementById('oilStatus').style.color = 'var(--muted)';
+  buildChecklistForm();
+  renderAll();
+  updateRepairBadge();
+  showToast('✅ Inspeção salva!');
+  setTimeout(() => switchTab('registros'), 1000);
+}
+
+// ═══ FILTERS ═══
+function getFilteredData() {
+  const placa = document.getElementById('filterPlaca').value;
+  const dtIni = document.getElementById('filterDtIni').value;
+  const dtFim = document.getElementById('filterDtFim').value;
+  const oleo = document.getElementById('filterOleo').value;
+  return db.filter(r => {
+    if (placa && r.placa !== placa) return false;
+    if (dtIni && r.data < dtIni) return false;
+    if (dtFim && r.data > dtFim) return false;
+    if (oleo && r.oilStatus !== oleo) return false;
+    return true;
+  }).sort((a,b) => b.data.localeCompare(a.data));
+}
+
+function clearFilters() {
+  ['filterPlaca','filterOleo'].forEach(id => document.getElementById(id).value = '');
+  ['filterDtIni','filterDtFim'].forEach(id => document.getElementById(id).value = '');
+  renderTable();
+}
+
+// ═══ HELPERS ═══
+function oilBadge(s) {
+  if (s === 'ok') return '<span class="badge badge-oil-ok">🟢 OK</span>';
+  if (s === 'warn') return '<span class="badge badge-oil-warn">🟡 Em breve</span>';
+  if (s === 'bad') return '<span class="badge badge-oil-bad">🔴 Vencido</span>';
+  return '<span style="color:var(--muted);font-size:.75rem">—</span>';
+}
+function fmtKm(v) { return v ? v.toLocaleString('pt-BR') + ' km' : '—'; }
+function fmtDate(d) { if (!d) return '—'; const [y,m,day] = d.split('-'); return `${day}/${m}/${y}`; }
+
+// ═══ RENDER TABLE (cards on mobile) ═══
+function renderTable() {
+  const rows = getFilteredData();
+  const list = document.getElementById('inspList');
+  const empty = document.getElementById('inspEmpty');
+
+  const sel = document.getElementById('filterPlaca');
+  const cur = sel.value;
+  const placas = [...new Set(db.map(r => r.placa))].sort();
+  sel.innerHTML = '<option value="">Todas</option>' +
+    placas.map(p => `<option value="${p}" ${p===cur?'selected':''}>${p}</option>`).join('');
+
+  if (!rows.length) { list.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+
+  list.innerHTML = rows.map(r => {
+    const ok = Object.values(r.checks).filter(v => v==='ok').length;
+    const def = Object.values(r.checks).filter(v => v==='def').length;
+    const atk = Object.values(r.checks).filter(v => v==='atk').length;
+    const oilClass = r.oilStatus === 'ok' ? 'oil-ok' : r.oilStatus === 'warn' ? 'oil-warn' : r.oilStatus === 'bad' ? 'oil-bad' : 'oil-pending';
+    return `<div class="insp-card ${oilClass}">
+      <div class="insp-header">
+        <span class="placa-tag">${r.placa}</span>
+        <span class="insp-modelo">${r.modelo}</span>
+        <span class="insp-date">${fmtDate(r.data)}</span>
+      </div>
+      <div class="insp-meta">
+        ${r.resp ? `<span class="meta-chip">👤 ${r.resp}</span>` : ''}
+        ${r.kmAtual ? `<span class="meta-chip">📍 ${fmtKm(r.kmAtual)}</span>` : ''}
+        ${oilBadge(r.oilStatus)}
+      </div>
+      <div class="insp-footer">
+        <span class="badge badge-ok">✅ ${ok} OK</span>
+        ${def > 0 ? `<span class="badge badge-def">❌ ${def}</span>` : ''}
+        ${atk > 0 ? `<span class="badge badge-atk">⚠️ ${atk}</span>` : ''}
+        <div class="action-btns">
+          <div class="act-btn" onclick="openDetail(${r.id})">👁️</div>
+          <div class="act-btn repair" onclick="openRepairRequest(${r.id})">🔧</div>
+          <div class="act-btn del" onclick="deleteRecord(${r.id})">🗑️</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderSummary() {
+  const total = db.length;
+  const placas = new Set(db.map(r => r.placa)).size;
+  const defeitos = db.reduce((a,r) => a + Object.values(r.checks).filter(v=>v==='def').length, 0);
+  const oleoBad = db.filter(r => r.oilStatus === 'bad' || r.oilStatus === 'warn').length;
+  const reparosAbertos = repairDB.filter(r => r.status === 'aberto').length;
+
+  document.getElementById('statsGrid').innerHTML = `
+    <div class="stat-card"><div class="val">${total}</div><div class="lbl">Inspeções</div></div>
+    <div class="stat-card"><div class="val" style="color:var(--accent2)">${placas}</div><div class="lbl">Veículos</div></div>
+    <div class="stat-card"><div class="val" style="color:var(--red)">${defeitos}</div><div class="lbl">Defeitos encontrados</div></div>
+    <div class="stat-card clickable" onclick="switchTab('reparos')"><div class="val" style="color:var(--red)">${reparosAbertos}</div><div class="lbl">🔧 Reparos abertos</div></div>
+  `;
+}
+
+function renderAll() { renderSummary(); renderTable(); }
+
+// ═══ REPAIR BADGE ═══
+function updateRepairBadge() {
+  const abertos = repairDB.filter(r => r.status === 'aberto').length;
+  const badge = document.getElementById('repairBadge');
+  if (abertos > 0) { badge.style.display = 'block'; badge.textContent = abertos; }
+  else { badge.style.display = 'none'; }
+}
+
+// ═══ DETAIL MODAL ═══
+function openDetail(id) {
+  const r = db.find(r => r.id === id);
+  if (!r) return;
+  document.getElementById('modalTitle').textContent = `${r.placa} — ${fmtDate(r.data)}`;
+  const checkRows = CHECKLIST_ITEMS.map((item, i) => {
+    const s = r.checks[i];
+    const badge = s === 'ok' ? '<span class="badge badge-ok">✅ OK</span>'
+      : s === 'def' ? '<span class="badge badge-def">❌ Defeito</span>'
+      : s === 'atk' ? '<span class="badge badge-atk">⚠️ Atenção</span>'
+      : '<span style="color:var(--muted);font-size:.75rem">Não verificado</span>';
+    return `<div class="detail-row"><span class="detail-lbl">${item}</span>${badge}</div>`;
+  }).join('');
+
+  document.getElementById('modalBody').innerHTML = `
+    <div class="section-label" style="margin-top:0">Dados do Veículo</div>
+    <div class="detail-row"><span class="detail-lbl">Modelo</span><span>${r.modelo}</span></div>
+    <div class="detail-row"><span class="detail-lbl">Placa</span><span class="placa-tag">${r.placa}</span></div>
+    ${r.resp ? `<div class="detail-row"><span class="detail-lbl">Responsável</span><span>${r.resp}</span></div>` : ''}
+    <div class="section-label">Quilometragem</div>
+    <div class="detail-row"><span class="detail-lbl">KM Atual</span><span>${fmtKm(r.kmAtual)}</span></div>
+    <div class="detail-row"><span class="detail-lbl">KM Última Troca</span><span>${fmtKm(r.kmUlt)}</span></div>
+    <div class="detail-row"><span class="detail-lbl">KM Próxima Troca</span><span>${fmtKm(r.kmProx)}</span></div>
+    <div class="detail-row"><span class="detail-lbl">Status Óleo</span>${oilBadge(r.oilStatus)}</div>
+    <div class="section-label">Itens de Verificação</div>
+    ${checkRows}
+    ${r.obs ? `<div class="section-label">Observações</div><p style="font-size:.84rem;color:var(--muted);line-height:1.5">${r.obs}</p>` : ''}
+    <div style="height:16px"></div>
+  `;
+  document.getElementById('modalOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+// ═══ DELETE ═══
+function deleteRecord(id) {
+  if (!confirm('Excluir esta inspeção?')) return;
+  db = db.filter(r => r.id !== id);
+  saveDB(); renderAll();
+}
+
+// ═══ REPAIR REQUEST ═══
+function openRepairRequest(inspectionId) {
+  const r = db.find(r => r.id === inspectionId);
+  if (!r) return;
+  const defects = CHECKLIST_ITEMS.filter((_, i) => r.checks[i] === 'def');
+  const atks = CHECKLIST_ITEMS.filter((_, i) => r.checks[i] === 'atk');
+  if (!defects.length && !atks.length && !r.obs) {
+    showToast('⚠️ Sem defeitos ou observações'); return;
+  }
+  const existing = repairDB.find(rp => rp.inspectionId === inspectionId && rp.status === 'aberto');
+  if (existing && !confirm('Já existe pedido aberto. Criar adicional?')) return;
+
+  repairDB.push({
+    id: Date.now(), inspectionId,
+    placa: r.placa, modelo: r.modelo, resp: r.resp,
+    dataInspecao: r.data, defects, atks, obs: r.obs,
+    status: 'aberto',
+    dataAbertura: new Date().toISOString().slice(0,10),
+    conclusion: null
+  });
+  saveRepairDB();
+  updateRepairBadge();
+  showToast('🔧 Pedido de reparo criado!');
+  switchTab('reparos');
+}
+
+// ═══ RENDER REPAIRS ═══
+function renderRepairs() {
+  const filterPlaca = document.getElementById('repairFilterPlaca') ? document.getElementById('repairFilterPlaca').value : '';
+  const filterStatus = document.getElementById('repairFilterStatus') ? document.getElementById('repairFilterStatus').value : '';
+
+  const abertos = repairDB.filter(r => r.status === 'aberto').length;
+  const concluidos = repairDB.filter(r => r.status === 'concluido').length;
+  const totalCusto = repairDB.filter(r=>r.status==='concluido'&&r.conclusion?.custo)
+    .reduce((s,r) => s + parseFloat(r.conclusion.custo||0), 0);
+
+  document.getElementById('repairStats').innerHTML = `
+    <div class="stat-card"><div class="val" style="color:var(--red)">${abertos}</div><div class="lbl">Em aberto</div></div>
+    <div class="stat-card"><div class="val" style="color:var(--green)">${concluidos}</div><div class="lbl">Concluídos</div></div>
+    <div class="stat-card"><div class="val" style="color:var(--accent2);font-size:1.2rem">R$${totalCusto.toLocaleString('pt-BR',{minimumFractionDigits:2})}</div><div class="lbl">Custo total</div></div>
+  `;
+
+  let rows = [...repairDB].sort((a,b) => {
+    if (a.status !== b.status) return a.status === 'aberto' ? -1 : 1;
+    return b.dataAbertura.localeCompare(a.dataAbertura);
+  });
+  if (filterPlaca) rows = rows.filter(r => r.placa === filterPlaca);
+  if (filterStatus) rows = rows.filter(r => r.status === filterStatus);
+
+  const list = document.getElementById('repairList');
+  const empty = document.getElementById('repairEmpty');
+  if (!rows.length) { list.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+
+  list.innerHTML = rows.map(r => {
+    const defTags = r.defects.map(d=>`<span class="defect-tag">❌ ${d}</span>`).join('');
+    const atkTags = r.atks.map(d=>`<span class="atk-tag">⚠️ ${d}</span>`).join('');
+    const obsBlock = r.obs ? `<div class="repair-obs">📝 ${r.obs}</div>` : '';
+    const conclusionBlock = r.status === 'concluido' && r.conclusion ? `
+      <div class="repair-conclusion">
+        <div class="c-lbl">Concluído em ${fmtDate(r.conclusion.dataConc)}</div>
+        <div style="margin-top:5px"><strong>Mecânico:</strong> ${r.conclusion.mecanico}</div>
+        ${r.conclusion.custo ? `<div><strong>Custo:</strong> R$ ${parseFloat(r.conclusion.custo).toLocaleString('pt-BR',{minimumFractionDigits:2})}</div>` : ''}
+        ${r.conclusion.pecas ? `<div><strong>Serviços:</strong> ${r.conclusion.pecas}</div>` : ''}
+        ${r.conclusion.obs ? `<div style="color:var(--muted);font-style:italic;margin-top:4px">${r.conclusion.obs}</div>` : ''}
+      </div>` : '';
+    const actions = r.status === 'aberto'
+      ? `<button class="btn-outline btn-green" onclick="openCloseRepairModal(${r.id})">✅ Fechar Reparo</button>
+         <button class="btn-outline btn-red" onclick="deleteRepair(${r.id})">🗑️ Excluir</button>`
+      : `<button class="btn-outline btn-red" onclick="deleteRepair(${r.id})">🗑️ Excluir</button>`;
+
+    return `<div class="repair-card ${r.status}">
+      <div class="repair-inner">
+        <div class="repair-top">
+          <span class="placa-tag">${r.placa}</span>
+          <span class="repair-model">${r.modelo}</span>
+          <span class="status-pill ${r.status}">${r.status === 'aberto' ? '🔴 Aberto' : '✅ Concluído'}</span>
+        </div>
+        <div class="repair-meta">📅 ${fmtDate(r.dataInspecao)}${r.resp ? ` · 👤 ${r.resp}` : ''}</div>
+        ${(defTags || atkTags) ? `<div class="defect-tags">${defTags}${atkTags}</div>` : ''}
+        ${obsBlock}${conclusionBlock}
+        <div class="repair-btns">${actions}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function deleteRepair(id) {
+  if (!confirm('Excluir este pedido?')) return;
+  repairDB = repairDB.filter(r => r.id !== id);
+  saveRepairDB(); updateRepairBadge(); renderRepairs();
+}
+
+// ═══ CLOSE REPAIR MODAL ═══
+function openCloseRepairModal(repairId) {
+  currentRepairId = repairId;
+  const r = repairDB.find(r => r.id === repairId);
+  if (!r) return;
+  document.getElementById('repairModalTitle').textContent = `Fechar — ${r.placa}`;
+  document.getElementById('repairDataConc').value = new Date().toISOString().slice(0,10);
+  ['repairMecanico','repairCusto','repairPecas','repairObsConc'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('repairMsg').style.display = 'none';
+
+  const defList = [...r.defects.map(d=>`❌ ${d}`), ...r.atks.map(d=>`⚠️ ${d}`)].join(', ');
+  document.getElementById('repairModalInfo').innerHTML = `
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:.82rem">
+      <span class="placa-tag">${r.placa}</span> <strong style="margin-left:6px">${r.modelo}</strong>
+      <div style="color:var(--muted);font-size:.76rem;margin-top:5px">📅 Inspeção: ${fmtDate(r.dataInspecao)}</div>
+      ${defList ? `<div style="margin-top:5px;font-size:.76rem;color:var(--red)">${defList}</div>` : ''}
+      ${r.obs ? `<div style="margin-top:4px;font-size:.75rem;color:var(--muted);font-style:italic">${r.obs}</div>` : ''}
+    </div>`;
+  document.getElementById('repairOverlay').classList.add('open');
+}
+function closeRepairModal() { document.getElementById('repairOverlay').classList.remove('open'); }
+
+function concludeRepair() {
+  const mecanico = document.getElementById('repairMecanico').value.trim();
+  const dataConc = document.getElementById('repairDataConc').value;
+  if (!mecanico || !dataConc) { showToast('⚠️ Preencha mecânico e data'); return; }
+
+  const idx = repairDB.findIndex(r => r.id === currentRepairId);
+  if (idx === -1) return;
+  repairDB[idx].status = 'concluido';
+  repairDB[idx].conclusion = {
+    mecanico, dataConc,
+    custo: document.getElementById('repairCusto').value || null,
+    pecas: document.getElementById('repairPecas').value.trim() || null,
+    obs: document.getElementById('repairObsConc').value.trim() || null
+  };
+  saveRepairDB();
+
+  const msg = document.getElementById('repairMsg');
+  msg.style.display = 'block';
+  setTimeout(() => {
+    closeRepairModal();
+    updateRepairBadge();
+    renderRepairs();
+    renderHistory();
+    showToast('✅ Reparo concluído!');
+  }, 1000);
+}
+
+// ═══ HISTORY ═══
+function renderHistory() {
+  const filterPlaca = document.getElementById('histFilterPlaca').value;
+  const filterDtIni = document.getElementById('histFilterDtIni').value;
+  const filterDtFim = document.getElementById('histFilterDtFim').value;
+
+  const sel = document.getElementById('histFilterPlaca');
+  const cur = sel.value;
+  const placas = [...new Set(repairDB.map(r => r.placa))].sort();
+  sel.innerHTML = '<option value="">Todas</option>' +
+    placas.map(p => `<option value="${p}" ${p===cur?'selected':''}>${p}</option>`).join('');
+
+  let rows = repairDB.filter(r => r.status === 'concluido');
+  if (filterPlaca) rows = rows.filter(r => r.placa === filterPlaca);
+  if (filterDtIni) rows = rows.filter(r => r.conclusion?.dataConc >= filterDtIni);
+  if (filterDtFim) rows = rows.filter(r => r.conclusion?.dataConc <= filterDtFim);
+  rows.sort((a,b) => (b.conclusion?.dataConc||'').localeCompare(a.conclusion?.dataConc||''));
+
+  const list = document.getElementById('historyList');
+  const empty = document.getElementById('historyEmpty');
+  if (!rows.length) { list.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+
+  list.innerHTML = rows.map(r => {
+    const c = r.conclusion;
+    const defAll = [...r.defects.map(d=>`❌ ${d}`), ...r.atks.map(d=>`⚠️ ${d}`)];
+    return `<div class="hist-card">
+      <div class="hist-top">
+        <span class="placa-tag">${r.placa}</span>
+        <strong>${r.modelo}</strong>
+        <span class="status-pill concluido" style="margin-left:auto">✅ Concluído</span>
+      </div>
+      <div class="hist-grid">
+        <div class="hist-field"><div class="lbl">Data inspeção</div><div class="val">${fmtDate(r.dataInspecao)}</div></div>
+        <div class="hist-field"><div class="lbl">Data conclusão</div><div class="val">${fmtDate(c.dataConc)}</div></div>
+        <div class="hist-field"><div class="lbl">Mecânico</div><div class="val">${c.mecanico}</div></div>
+        ${c.custo ? `<div class="hist-field"><div class="lbl">Custo</div><div class="val" style="color:var(--accent2)">R$ ${parseFloat(c.custo).toLocaleString('pt-BR',{minimumFractionDigits:2})}</div></div>` : ''}
+      </div>
+      ${defAll.length ? `<div class="defect-tags" style="margin-top:10px">${defAll.map(d=>`<span class="defect-tag">${d}</span>`).join('')}</div>` : ''}
+      ${c.pecas ? `<div style="font-size:.78rem;margin-top:8px"><strong>Serviços:</strong> ${c.pecas}</div>` : ''}
+      ${r.obs ? `<div style="font-size:.75rem;color:var(--muted);margin-top:4px;font-style:italic">Obs: ${r.obs}</div>` : ''}
+      ${c.obs ? `<div style="font-size:.75rem;color:var(--muted);margin-top:2px;font-style:italic">Obs reparo: ${c.obs}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ═══ FILTER SHEET ═══
+function openFilterSheet() { document.getElementById('filterOverlay').classList.add('open'); }
+function closeFilterSheet() { document.getElementById('filterOverlay').classList.remove('open'); }
+
+// ═══ EXPORT / IMPORT ═══
+function exportJSON() {
+  const payload = { exportedAt: new Date().toISOString(), version: 1, inspections: db, repairs: repairDB };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `checklist_veiculos_${new Date().toISOString().slice(0,10)}.json`;
+  a.click(); URL.revokeObjectURL(url);
+}
+
+function importJSON(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const payload = JSON.parse(e.target.result);
+      if (!payload.inspections || !Array.isArray(payload.inspections)) {
+        showToast('❌ Arquivo inválido'); return;
+      }
+      if (!confirm(`Importar ${payload.inspections.length} inspeção(ões) e ${Array.isArray(payload.repairs)?payload.repairs.length:0} reparo(s)?`)) {
+        event.target.value = ''; return;
+      }
+      const existingInspIds = new Set(db.map(r => r.id));
+      const newInsp = payload.inspections.filter(r => !existingInspIds.has(r.id));
+      const existingRepIds = new Set(repairDB.map(r => r.id));
+      const newRep = Array.isArray(payload.repairs) ? payload.repairs.filter(r => !existingRepIds.has(r.id)) : [];
+      db = [...db, ...newInsp];
+      repairDB = [...repairDB, ...newRep];
+      saveDB(); saveRepairDB();
+      renderAll(); updateRepairBadge();
+      showToast(`✅ ${newInsp.length} inspeções importadas`);
+    } catch (err) { showToast('❌ Erro ao ler arquivo'); }
+    event.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
+// ═══ CHARTS ═══
+function destroyChart(id) { if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; } }
+
+function renderCharts() {
+  if (!db.length) {
+    document.getElementById('chartsEmpty').style.display = 'block';
+    document.querySelectorAll('.chart-card').forEach(el => el.style.display = 'none');
+    return;
+  }
+  document.getElementById('chartsEmpty').style.display = 'none';
+  document.querySelectorAll('.chart-card').forEach(el => el.style.display = 'block');
+
+  const COLORS = ['#4f8ef7','#f7a14f','#3dd68c','#f75f5f','#a78bfa','#f7c94f','#38bdf8','#fb923c'];
+  const placaMap = {};
+  db.forEach(r => { if (!placaMap[r.placa] || r.data > placaMap[r.placa].data) placaMap[r.placa] = r; });
+  const labels1 = Object.keys(placaMap);
+  const data1 = labels1.map(p => placaMap[p].kmAtual || 0);
+
+  destroyChart('kmTotal');
+  chartInstances['kmTotal'] = new Chart(document.getElementById('chartKmTotal'), {
+    type: 'bar',
+    data: { labels: labels1, datasets: [{ label: 'KM', data: data1, backgroundColor: COLORS, borderRadius: 6 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#7b82a8', font: { size: 11 } }, grid: { color: '#2e3350' } },
+        y: { ticks: { color: '#7b82a8', font: { size: 11 }, callback: v => v.toLocaleString('pt-BR') }, grid: { color: '#2e3350' } }
+      }
+    }
+  });
+
+  destroyChart('kmMes');
+  const now = new Date();
+  const months = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push({ key: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`, label: d.toLocaleString('pt-BR',{month:'short'}) });
+  }
+  const datasets2 = labels1.map((placa, ci) => {
+    const records = db.filter(r => r.placa === placa && r.kmAtual).sort((a,b) => a.data.localeCompare(b.data));
+    const monthData = months.map(m => {
+      const inMonth = records.filter(r => r.data.startsWith(m.key));
+      if (!inMonth.length) return null;
+      return Math.round(inMonth.reduce((s,r) => s + r.kmAtual, 0) / inMonth.length);
+    });
+    return { label: placa, data: monthData, borderColor: COLORS[ci%COLORS.length], backgroundColor: COLORS[ci%COLORS.length]+'30', tension: 0.3, fill: true, spanGaps: true, pointRadius: 3 };
+  }).filter(d => d.data.some(v => v !== null));
+
+  chartInstances['kmMes'] = new Chart(document.getElementById('chartKmMes'), {
+    type: 'line',
+    data: { labels: months.map(m => m.label), datasets: datasets2 },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#7b82a8', boxWidth: 10, font: { size: 11 } } } },
+      scales: {
+        x: { ticks: { color: '#7b82a8', font: { size: 11 } }, grid: { color: '#2e3350' } },
+        y: { ticks: { color: '#7b82a8', font: { size: 11 } }, grid: { color: '#2e3350' } }
+      }
+    }
+  });
+
+  destroyChart('itens');
+  let totalOk=0, totalDef=0, totalAtk=0, totalNd=0;
+  db.forEach(r => { Object.values(r.checks).forEach(v => {
+    if (v==='ok') totalOk++; else if (v==='def') totalDef++; else if (v==='atk') totalAtk++; else totalNd++;
+  }); });
+  chartInstances['itens'] = new Chart(document.getElementById('chartItens'), {
+    type: 'doughnut',
+    data: {
+      labels: ['✅ OK','❌ Defeito','⚠️ Atenção','Não verif.'],
+      datasets: [{ data: [totalOk,totalDef,totalAtk,totalNd], backgroundColor: ['#3dd68c','#f75f5f','#f7c94f','#2e3350'], borderWidth: 0 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { color: '#7b82a8', padding: 10, boxWidth: 10, font: { size: 11 } } } }
+    }
+  });
+
+  destroyChart('oleo');
+  const oleoOk = labels1.map(p => db.filter(r => r.placa===p && r.oilStatus==='ok').length);
+  const oleoWarn = labels1.map(p => db.filter(r => r.placa===p && r.oilStatus==='warn').length);
+  const oleoBad = labels1.map(p => db.filter(r => r.placa===p && r.oilStatus==='bad').length);
+  chartInstances['oleo'] = new Chart(document.getElementById('chartOleo'), {
+    type: 'bar',
+    data: {
+      labels: labels1,
+      datasets: [
+        { label: '✅ OK', data: oleoOk, backgroundColor: '#3dd68c', borderRadius: 4 },
+        { label: '⚠️ Em breve', data: oleoWarn, backgroundColor: '#f7c94f', borderRadius: 4 },
+        { label: '🔴 Vencido', data: oleoBad, backgroundColor: '#f75f5f', borderRadius: 4 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#7b82a8', boxWidth: 10, font: { size: 11 } } } },
+      scales: {
+        x: { stacked: true, ticks: { color: '#7b82a8', font: { size: 11 } }, grid: { color: '#2e3350' } },
+        y: { stacked: true, ticks: { color: '#7b82a8', font: { size: 11 }, stepSize: 1 }, grid: { color: '#2e3350' } }
+      }
+    }
+  });
+}
+</script>
+</body>
+</html>
