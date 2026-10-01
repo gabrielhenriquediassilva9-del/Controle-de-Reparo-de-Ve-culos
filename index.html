@@ -644,6 +644,13 @@ input[type=date] { color-scheme: dark; }
       <div class="section-label">Dados do Veículo</div>
       <div class="form-group">
         <div class="form-row">
+          <label>Tipo *</label>
+          <select id="fTipo" onchange="onTipoChange()">
+            <option value="carro">🚗 Carro</option>
+            <option value="moto">🏍️ Moto</option>
+          </select>
+        </div>
+        <div class="form-row">
           <label>Veículo *</label>
           <input type="text" id="fModelo" placeholder="Ex: Fiat Strada 2022">
         </div>
@@ -877,12 +884,25 @@ input[type=date] { color-scheme: dark; }
 
 <script>
 // ═══ DATA ═══
-const CHECKLIST_ITEMS = [
+const CHECKLIST_ITEMS_CARRO = [
   'Setas dianteiras (esq. e dir.)','Setas traseiras (esq. e dir.)',
   'Farol baixo','Farol alto','Luz de freio','Luz de placa','Luz de ré',
   'Macaco / Chave de roda','Estepe de roda','Triângulo de sinalização',
   'Líquido de arrefecimento','Nível de óleo do motor','Pressão dos pneus','Limpadores de para-brisa',
 ];
+const CHECKLIST_ITEMS_MOTO = [
+  'Setas dianteiras (esq. e dir.)','Setas traseiras (esq. e dir.)',
+  'Farol baixo','Farol alto','Luz de freio','Luz de placa','Luz de ré',
+];
+
+function getChecklistItems() {
+  const tipo = document.getElementById('fTipo') ? document.getElementById('fTipo').value : 'carro';
+  return tipo === 'moto' ? CHECKLIST_ITEMS_MOTO : CHECKLIST_ITEMS_CARRO;
+}
+function getOilInterval() {
+  const tipo = document.getElementById('fTipo') ? document.getElementById('fTipo').value : 'carro';
+  return tipo === 'moto' ? 1000 : 5000;
+}
 
 let checkStates = {};
 let db = loadDB();
@@ -933,9 +953,11 @@ function switchTab(name) {
 
 // ═══ CHECKLIST FORM ═══
 function buildChecklistForm() {
+  const items = getChecklistItems();
   const grid = document.getElementById('checklistGrid');
   grid.innerHTML = '';
-  CHECKLIST_ITEMS.forEach((item, i) => {
+  checkStates = {};
+  items.forEach((item, i) => {
     checkStates[i] = '';
     const row = document.createElement('div');
     row.className = 'check-row';
@@ -950,6 +972,13 @@ function buildChecklistForm() {
   });
 }
 
+function onTipoChange() {
+  buildChecklistForm();
+  calcOil();
+  const tipo = document.getElementById('fTipo').value;
+  document.getElementById('fModelo').placeholder = tipo === 'moto' ? 'Ex: Honda CG 160 2023' : 'Ex: Fiat Strada 2022';
+}
+
 function setCheck(i, state) {
   checkStates[i] = checkStates[i] === state ? '' : state;
   document.getElementById(`cb-${i}-ok`).className = `tri-btn${checkStates[i]==='ok'?' sel-ok':''}`;
@@ -961,24 +990,29 @@ function setCheck(i, state) {
 function calcOil() {
   const atual = parseInt(document.getElementById('fKmAtual').value) || 0;
   const ult = parseInt(document.getElementById('fKmUltTroca').value) || 0;
-  const prox = ult + 5000;
+  const interval = getOilInterval();
+  const alertZone = interval === 1000 ? 100 : 500; // 10% do intervalo
+  const prox = ult + interval;
   document.getElementById('fKmProxTroca').value = ult > 0 ? prox : '';
   const el = document.getElementById('oilStatus');
   if (!atual || !ult) { el.textContent = '— Preencha o KM atual e KM da última troca'; el.style.color = 'var(--muted)'; return; }
   if (atual >= prox) { el.textContent = '🔴 TROCA DE ÓLEO NECESSÁRIA'; el.style.color = 'var(--red)'; }
-  else if (atual >= prox - 500) { el.textContent = '🟡 TROCAR EM BREVE (menos de 500 km)'; el.style.color = 'var(--yellow)'; }
+  else if (atual >= prox - alertZone) { el.textContent = `🟡 TROCAR EM BREVE (menos de ${alertZone.toLocaleString('pt-BR')} km)`; el.style.color = 'var(--yellow)'; }
   else { el.textContent = `🟢 ÓLEO OK — Próxima troca em ${(prox - atual).toLocaleString('pt-BR')} km`; el.style.color = 'var(--green)'; }
 }
 
 // ═══ SAVE ═══
 function saveInspection() {
+  const tipo = document.getElementById('fTipo').value;
   const modelo = document.getElementById('fModelo').value.trim();
   const placa = document.getElementById('fPlaca').value.trim().toUpperCase();
   const data = document.getElementById('fData').value;
   const resp = document.getElementById('fResponsavel').value.trim();
   const kmAtual = parseInt(document.getElementById('fKmAtual').value) || null;
   const kmUlt = parseInt(document.getElementById('fKmUltTroca').value) || null;
-  const kmProx = kmUlt ? kmUlt + 5000 : null;
+  const interval = getOilInterval();
+  const alertZone = interval === 1000 ? 100 : 500;
+  const kmProx = kmUlt ? kmUlt + interval : null;
   const obs = document.getElementById('fObs').value.trim();
 
   if (!modelo || !placa || !data) { showToast('⚠️ Preencha veículo, placa e data'); return; }
@@ -986,13 +1020,14 @@ function saveInspection() {
   let oilStatus = 'pending';
   if (kmAtual && kmProx) {
     if (kmAtual >= kmProx) oilStatus = 'bad';
-    else if (kmAtual >= kmProx - 500) oilStatus = 'warn';
+    else if (kmAtual >= kmProx - alertZone) oilStatus = 'warn';
     else oilStatus = 'ok';
   }
 
+  const items = getChecklistItems();
   const checks = {};
-  CHECKLIST_ITEMS.forEach((_, i) => { checks[i] = checkStates[i] || 'nd'; });
-  db.push({ id: Date.now(), modelo, placa, data, resp, kmAtual, kmUlt, kmProx, oilStatus, checks, obs });
+  items.forEach((_, i) => { checks[i] = checkStates[i] || 'nd'; });
+  db.push({ id: Date.now(), tipo, modelo, placa, data, resp, kmAtual, kmUlt, kmProx, oilStatus, checks, obs, checklistItems: items });
   saveDB();
 
   const msg = document.getElementById('formMsg');
@@ -1001,6 +1036,7 @@ function saveInspection() {
 
   // reset
   ['fModelo','fPlaca','fResponsavel','fKmAtual','fKmUltTroca','fObs'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('fTipo').value = 'carro';
   document.getElementById('fData').value = new Date().toISOString().slice(0,10);
   document.getElementById('fKmProxTroca').value = '';
   document.getElementById('oilStatus').textContent = '— Preencha o KM atual e KM da última troca';
@@ -1063,10 +1099,11 @@ function renderTable() {
     const def = Object.values(r.checks).filter(v => v==='def').length;
     const atk = Object.values(r.checks).filter(v => v==='atk').length;
     const oilClass = r.oilStatus === 'ok' ? 'oil-ok' : r.oilStatus === 'warn' ? 'oil-warn' : r.oilStatus === 'bad' ? 'oil-bad' : 'oil-pending';
+    const tipoIcon = r.tipo === 'moto' ? '🏍️' : '🚗';
     return `<div class="insp-card ${oilClass}">
       <div class="insp-header">
         <span class="placa-tag">${r.placa}</span>
-        <span class="insp-modelo">${r.modelo}</span>
+        <span class="insp-modelo">${tipoIcon} ${r.modelo}</span>
         <span class="insp-date">${fmtDate(r.data)}</span>
       </div>
       <div class="insp-meta">
@@ -1117,8 +1154,11 @@ function updateRepairBadge() {
 function openDetail(id) {
   const r = db.find(r => r.id === id);
   if (!r) return;
+  const tipoLabel = r.tipo === 'moto' ? '🏍️ Moto' : '🚗 Carro';
   document.getElementById('modalTitle').textContent = `${r.placa} — ${fmtDate(r.data)}`;
-  const checkRows = CHECKLIST_ITEMS.map((item, i) => {
+  // usa os itens gravados na inspeção ou fallback para lista do tipo
+  const items = r.checklistItems || (r.tipo === 'moto' ? CHECKLIST_ITEMS_MOTO : CHECKLIST_ITEMS_CARRO);
+  const checkRows = items.map((item, i) => {
     const s = r.checks[i];
     const badge = s === 'ok' ? '<span class="badge badge-ok">✅ OK</span>'
       : s === 'def' ? '<span class="badge badge-def">❌ Defeito</span>'
@@ -1129,6 +1169,7 @@ function openDetail(id) {
 
   document.getElementById('modalBody').innerHTML = `
     <div class="section-label" style="margin-top:0">Dados do Veículo</div>
+    <div class="detail-row"><span class="detail-lbl">Tipo</span><span>${tipoLabel}</span></div>
     <div class="detail-row"><span class="detail-lbl">Modelo</span><span>${r.modelo}</span></div>
     <div class="detail-row"><span class="detail-lbl">Placa</span><span class="placa-tag">${r.placa}</span></div>
     ${r.resp ? `<div class="detail-row"><span class="detail-lbl">Responsável</span><span>${r.resp}</span></div>` : ''}
@@ -1161,8 +1202,9 @@ function deleteRecord(id) {
 function openRepairRequest(inspectionId) {
   const r = db.find(r => r.id === inspectionId);
   if (!r) return;
-  const defects = CHECKLIST_ITEMS.filter((_, i) => r.checks[i] === 'def');
-  const atks = CHECKLIST_ITEMS.filter((_, i) => r.checks[i] === 'atk');
+  const items = r.checklistItems || (r.tipo === 'moto' ? CHECKLIST_ITEMS_MOTO : CHECKLIST_ITEMS_CARRO);
+  const defects = items.filter((_, i) => r.checks[i] === 'def');
+  const atks = items.filter((_, i) => r.checks[i] === 'atk');
   if (!defects.length && !atks.length && !r.obs) {
     showToast('⚠️ Sem defeitos ou observações'); return;
   }
