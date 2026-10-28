@@ -990,11 +990,21 @@ function setCheck(i, state) {
 function calcOil() {
   const atual = parseInt(document.getElementById('fKmAtual').value) || 0;
   const ult = parseInt(document.getElementById('fKmUltTroca').value) || 0;
+  const tipo = document.getElementById('fTipo').value;
   const interval = getOilInterval();
   const alertZone = interval === 1000 ? 100 : 500; // 10% do intervalo
+  const el = document.getElementById('oilStatus');
+  if (tipo === 'moto') {
+    // Moto: próxima troca sempre 1000 km a partir do KM atual
+    const prox = atual > 0 ? atual + interval : '';
+    document.getElementById('fKmProxTroca').value = prox;
+    if (!atual) { el.textContent = '— Preencha o KM atual'; el.style.color = 'var(--muted)'; return; }
+    el.textContent = `🟢 ÓLEO — Próxima troca em ${prox.toLocaleString('pt-BR')} km (1.000 km a partir do atual)`;
+    el.style.color = 'var(--green)';
+    return;
+  }
   const prox = ult + interval;
   document.getElementById('fKmProxTroca').value = ult > 0 ? prox : '';
-  const el = document.getElementById('oilStatus');
   if (!atual || !ult) { el.textContent = '— Preencha o KM atual e KM da última troca'; el.style.color = 'var(--muted)'; return; }
   if (atual >= prox) { el.textContent = '🔴 TROCA DE ÓLEO NECESSÁRIA'; el.style.color = 'var(--red)'; }
   else if (atual >= prox - alertZone) { el.textContent = `🟡 TROCAR EM BREVE (menos de ${alertZone.toLocaleString('pt-BR')} km)`; el.style.color = 'var(--yellow)'; }
@@ -1012,7 +1022,8 @@ function saveInspection() {
   const kmUlt = parseInt(document.getElementById('fKmUltTroca').value) || null;
   const interval = getOilInterval();
   const alertZone = interval === 1000 ? 100 : 500;
-  const kmProx = kmUlt ? kmUlt + interval : null;
+  const tipo_ = document.getElementById('fTipo').value;
+  const kmProx = tipo_ === 'moto' ? (kmAtual ? kmAtual + interval : null) : (kmUlt ? kmUlt + interval : null);
   const obs = document.getElementById('fObs').value.trim();
 
   if (!modelo || !placa || !data) { showToast('⚠️ Preencha veículo, placa e data'); return; }
